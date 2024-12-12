@@ -24,6 +24,9 @@
     <ClCompile Include="src\ErrorHandling.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\HttpClient.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include=".gitignore" />
@@ -34,6 +37,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\ErrorHandling.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\HttpClient.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\httplib.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

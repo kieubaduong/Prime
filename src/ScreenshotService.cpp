@@ -1,56 +1,21 @@
 #include "../include/ScreenshotService.h"
 #include "../include/ErrorHandling.h"
+#include "../include/HttpClient.h"
 
 #include <iostream>
 #include <vector>
 #include <sstream>
 #include <stdexcept>
+#include <iomanip>
+#include <fstream>
 
-#define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
 
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
 
-ScreenshotService::ScreenshotService() {
+ScreenshotService::ScreenshotService() : capturing(false), frameCounter(0) {
     InitializeD3D();
-}
-
-ScreenshotService::~ScreenshotService() {
-    CleanupD3D();
-}
-
-void ScreenshotService::CaptureScreen() {
-    HRESULT hr = S_OK;
-
-    DXGI_OUTDUPL_FRAME_INFO frameInfo;
-    IDXGIResource* desktopResource = nullptr;
-    hr = g_duplication->AcquireNextFrame(500, &frameInfo, &desktopResource);
-    if (FAILED(hr)) {
-        ErrorHandling::PrintError(hr, "Failed to acquire next frame");
-        return;
-    }
-
-    while (frameInfo.AccumulatedFrames == 0) {
-        std::cout << "No new frames accumulated." << std::endl;
-        g_duplication->ReleaseFrame();
-        hr = g_duplication->AcquireNextFrame(500, &frameInfo, &desktopResource);
-        if (FAILED(hr)) {
-            ErrorHandling::PrintError(hr, "Failed to acquire next frame");
-            return;
-        }
-    }
-
-    ID3D11Texture2D* frameTexture;
-    hr = desktopResource->QueryInterface(__uuidof(ID3D11Texture2D), (void**)&frameTexture);
-    if (FAILED(hr)) {
-        ErrorHandling::PrintError(hr, "Failed to query interface");
-        return;
-    }
-
-    SaveTextureToFile(frameTexture, "screenshot.png");
-
-    g_duplication->ReleaseFrame();
 }
 
 void ScreenshotService::InitializeD3D() {
@@ -84,21 +49,59 @@ void ScreenshotService::InitializeD3D() {
     }
 }
 
-void ScreenshotService::CleanupD3D() {
-    if (g_context) g_context->Release();
-    if (g_device) g_device->Release();
-    if (g_duplication) g_duplication->Release();
-    if (g_output1) g_output1->Release();
-    if (g_output) g_output->Release();
-    if (g_adapter) g_adapter->Release();
-    if (g_dxgiDevice) g_dxgiDevice->Release();
-}
-
-void ScreenshotService::SaveTextureToFile(ID3D11Texture2D* texture, const char* filename) {
+void ScreenshotService::CaptureScreen() {
     HRESULT hr = S_OK;
 
+    DXGI_OUTDUPL_FRAME_INFO frameInfo;
+    frameInfo.AccumulatedFrames = 0;
+    IDXGIResource* desktopResource = nullptr;
+
+    while (frameInfo.AccumulatedFrames == 0) {
+        std::cout << "No new frames accumulated." << std::endl;
+        g_duplication->ReleaseFrame();
+        hr = g_duplication->AcquireNextFrame(0, &frameInfo, &desktopResource);
+        if (FAILED(hr)) {
+            ErrorHandling::PrintError(hr, "Failed to acquire next frame");
+            return;
+        }
+    }
+
+    ID3D11Texture2D* frameTexture;
+    hr = desktopResource->QueryInterface(__uuidof(ID3D11Texture2D), (void**)&frameTexture);
+    if (FAILED(hr)) {
+        ErrorHandling::PrintError(hr, "Failed to query interface");
+        return;
+    }
+
+    g_duplication->ReleaseFrame();
+}
+
+std::vector<unsigned char> ScreenshotService::ReturnCapturedImage() {
+    HRESULT hr = S_OK;
+
+    DXGI_OUTDUPL_FRAME_INFO frameInfo{};
+    frameInfo.AccumulatedFrames = 0;
+    IDXGIResource* desktopResource = nullptr;
+
+    while (frameInfo.AccumulatedFrames == 0) {
+        std::cout << "No new frames accumulated." << std::endl;
+        g_duplication->ReleaseFrame();
+        hr = g_duplication->AcquireNextFrame(500, &frameInfo, &desktopResource);
+        if (FAILED(hr)) {
+            ErrorHandling::PrintError(hr, "Failed to acquire next frame");
+            return {};
+        }
+    }
+
+    ID3D11Texture2D* frameTexture{};
+    hr = desktopResource->QueryInterface(__uuidof(ID3D11Texture2D), (void**)&frameTexture);
+    if (FAILED(hr)) {
+        ErrorHandling::PrintError(hr, "Failed to query interface");
+        return {};
+    }
+
     D3D11_TEXTURE2D_DESC desc = {};
-    texture->GetDesc(&desc);
+    frameTexture->GetDesc(&desc);
     desc.Usage = D3D11_USAGE_STAGING;
     desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
     desc.BindFlags = 0;
@@ -108,16 +111,16 @@ void ScreenshotService::SaveTextureToFile(ID3D11Texture2D* texture, const char* 
     hr = g_device->CreateTexture2D(&desc, nullptr, &stagingTexture);
     if (FAILED(hr)) {
         ErrorHandling::PrintError(hr, "Failed to create staging texture");
-        return;
+        return {};
     }
 
-    g_context->CopyResource(stagingTexture, texture);
+    g_context->CopyResource(stagingTexture, frameTexture);
 
     D3D11_MAPPED_SUBRESOURCE mappedResource;
     hr = g_context->Map(stagingTexture, 0, D3D11_MAP_READ, 0, &mappedResource);
     if (FAILED(hr)) {
         ErrorHandling::PrintError(hr, "Failed to map staging texture");
-        return;
+        return {};
     }
 
     auto const* data = reinterpret_cast<unsigned char*>(mappedResource.pData);
@@ -128,13 +131,36 @@ void ScreenshotService::SaveTextureToFile(ID3D11Texture2D* texture, const char* 
         memcpy(buffer.data() + y * desc.Width * 4, data + y * rowPitch, desc.Width * 4);
     }
 
-    if (!stbi_write_png(filename, desc.Width, desc.Height, 4, buffer.data(), desc.Width * 4)) {
-        ErrorHandling::PrintError(hr, "Failed to write image file");
-        g_context->Unmap(stagingTexture, 0);
-        return;
-    }
-
-    std::cout << "Image saved to " << filename << std::endl;
-
     g_context->Unmap(stagingTexture, 0);
+    g_duplication->ReleaseFrame();
+
+    return buffer;
+}
+
+void ScreenshotService::CleanupD3D() {
+    if (g_context) {
+        g_context->Release();
+    }
+    if (g_device) {
+        g_device->Release();
+    }
+    if (g_duplication) {
+        g_duplication->Release();
+    }
+    if (g_output1) {
+        g_output1->Release();
+    }
+    if (g_output) {
+        g_output->Release();
+    }
+    if (g_adapter) {
+        g_adapter->Release();
+    }
+    if (g_dxgiDevice) {
+        g_dxgiDevice->Release();
+    }
+}
+
+ScreenshotService::~ScreenshotService() {
+    CleanupD3D();
 }

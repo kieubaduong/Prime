@@ -4,6 +4,9 @@
 #include <dxgi1_2.h>
 #include <wrl/client.h>
 #include <string>
+#include <thread>
+#include <atomic>
+#include <vector>
 
 class ScreenshotService {
 public:
@@ -11,6 +14,8 @@ public:
     ~ScreenshotService();
 
     void CaptureScreen();
+
+    std::vector<unsigned char> ReturnCapturedImage();
 
 private:
     ID3D11Device* g_device = nullptr;
@@ -21,7 +26,11 @@ private:
     IDXGIOutput1* g_output1 = nullptr;
     IDXGIOutputDuplication* g_duplication = nullptr;
 
+    std::thread captureThread;
+    std::atomic<bool> capturing;
+    std::atomic<int> frameCounter;
+
     void InitializeD3D();
     void CleanupD3D();
-    void SaveTextureToFile(ID3D11Texture2D* texture, const char* filename);
+    
 };
