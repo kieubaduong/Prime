@@ -13,9 +13,7 @@ public:
     ScreenshotService();
     ~ScreenshotService();
 
-    void CaptureScreen();
-
-    std::vector<unsigned char> ReturnCapturedImage();
+    std::vector<unsigned char> CaptureScreen();
 
 private:
     ID3D11Device* g_device = nullptr;
@@ -25,10 +23,6 @@ private:
     IDXGIOutput* g_output = nullptr;
     IDXGIOutput1* g_output1 = nullptr;
     IDXGIOutputDuplication* g_duplication = nullptr;
-
-    std::thread captureThread;
-    std::atomic<bool> capturing;
-    std::atomic<int> frameCounter;
 
     void InitializeD3D();
     void CleanupD3D();

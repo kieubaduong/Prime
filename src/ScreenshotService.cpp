@@ -1,6 +1,5 @@
 #include "../include/ScreenshotService.h"
 #include "../include/ErrorHandling.h"
-#include "../include/HttpClient.h"
 
 #include <iostream>
 #include <vector>
@@ -14,7 +13,7 @@
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
 
-ScreenshotService::ScreenshotService() : capturing(false), frameCounter(0) {
+ScreenshotService::ScreenshotService() {
     InitializeD3D();
 }
 
@@ -49,34 +48,7 @@ void ScreenshotService::InitializeD3D() {
     }
 }
 
-void ScreenshotService::CaptureScreen() {
-    HRESULT hr = S_OK;
-
-    DXGI_OUTDUPL_FRAME_INFO frameInfo;
-    frameInfo.AccumulatedFrames = 0;
-    IDXGIResource* desktopResource = nullptr;
-
-    while (frameInfo.AccumulatedFrames == 0) {
-        std::cout << "No new frames accumulated." << std::endl;
-        g_duplication->ReleaseFrame();
-        hr = g_duplication->AcquireNextFrame(0, &frameInfo, &desktopResource);
-        if (FAILED(hr)) {
-            ErrorHandling::PrintError(hr, "Failed to acquire next frame");
-            return;
-        }
-    }
-
-    ID3D11Texture2D* frameTexture;
-    hr = desktopResource->QueryInterface(__uuidof(ID3D11Texture2D), (void**)&frameTexture);
-    if (FAILED(hr)) {
-        ErrorHandling::PrintError(hr, "Failed to query interface");
-        return;
-    }
-
-    g_duplication->ReleaseFrame();
-}
-
-std::vector<unsigned char> ScreenshotService::ReturnCapturedImage() {
+std::vector<unsigned char> ScreenshotService::CaptureScreen() {
     HRESULT hr = S_OK;
 
     DXGI_OUTDUPL_FRAME_INFO frameInfo{};
