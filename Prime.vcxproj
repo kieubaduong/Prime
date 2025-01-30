@@ -129,6 +129,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\Global.cpp" />
     <ClCompile Include="src\ErrorHandling.cpp" />
     <ClCompile Include="Prime.cpp" />
     <ClCompile Include="src\ScreenshotService.cpp" />
@@ -136,8 +137,10 @@
   <ItemGroup>
     <None Include=".gitattributes" />
     <None Include=".gitignore" />
+    <None Include="README.md" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\Global.h" />
     <ClInclude Include="include\httplib.h" />
     <ClInclude Include="include\ErrorHandling.h" />
     <ClInclude Include="include\ScreenshotService.h" />

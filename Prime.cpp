@@ -10,10 +10,11 @@
 #include <uwebsockets/App.h>
 
 #include "include/ScreenshotService.h"
+#include "include/Global.h"
 
 struct PerSocketData {};
 
-static bool CaptureAndCheckImage(ScreenshotService& screenshotService, std::vector<unsigned char>& buffer, int width, int height, int channels) {
+static bool CaptureAndCheckImage(ScreenshotService& screenshotService, std::vector<unsigned char>& buffer) {
     buffer = screenshotService.CaptureScreen();
 
     if (buffer.empty()) {
@@ -21,7 +22,7 @@ static bool CaptureAndCheckImage(ScreenshotService& screenshotService, std::vect
         return false;
     }
 
-    if (buffer.size() != static_cast<unsigned long long>(width) * height * channels) {
+    if (buffer.size() != static_cast<unsigned long long>(g_width) * g_height * g_channels) {
         std::cerr << "Captured image has wrong size" << std::endl;
         return false;
     }
@@ -29,9 +30,9 @@ static bool CaptureAndCheckImage(ScreenshotService& screenshotService, std::vect
     return true;
 }
 
-static void ConvertAndSendImage(uWS::WebSocket<false, true, PerSocketData>* ws, const std::vector<unsigned char>& buffer, int width, int height, int channels) {
+static void ConvertAndSendImage(uWS::WebSocket<false, true, PerSocketData>* ws, const std::vector<unsigned char>& buffer) {
     int png_size;
-    unsigned char* png_data = stbi_write_png_to_mem(buffer.data(), 0, width, height, channels, &png_size);
+    unsigned char* png_data = stbi_write_png_to_mem(buffer.data(), 0, g_width, g_height, g_channels, &png_size);
 
     if (png_data) {
         std::string_view png_view(reinterpret_cast<const char*>(png_data), png_size);
@@ -47,11 +48,8 @@ static void ConvertAndSendImage(uWS::WebSocket<false, true, PerSocketData>* ws, 
 int main() {
     ScreenshotService screenshotService;
     std::vector<unsigned char> buffer;
-    int width = 1920;
-    int height = 1080;
-    int channels = 4; // RGBA format
 
-    uWS::App().ws<PerSocketData>("/*", {
+    uWS::App().ws<PerSocketData>("/*", { 
         .compression = uWS::SHARED_COMPRESSOR,
         .maxPayloadLength = 16 * 1024 * 1024,
         .idleTimeout = 10,
@@ -59,13 +57,13 @@ int main() {
         .open = []([[maybe_unused]] auto* ws) {
             std::cout << "Client connected" << std::endl;
         },
-        .message = [&buffer, &screenshotService, width, height, channels](auto* ws, [[maybe_unused]] std::string_view message, [[maybe_unused]] uWS::OpCode opCode) {
+        .message = [&buffer, &screenshotService](auto* ws, [[maybe_unused]] std::string_view message, [[maybe_unused]] uWS::OpCode opCode) {
             while (true) {
-                if (!CaptureAndCheckImage(screenshotService, buffer, width, height, channels)) {
+                if (!CaptureAndCheckImage(screenshotService, buffer)) {
                     break;
                 }
 
-                ConvertAndSendImage(ws, buffer, width, height, channels);
+                ConvertAndSendImage(ws, buffer);
 
                 std::this_thread::sleep_for(std::chrono::milliseconds(1000));
             }
@@ -73,14 +71,13 @@ int main() {
         .close = []([[maybe_unused]] auto* ws, [[maybe_unused]] int code, [[maybe_unused]] std::string_view message) {
             std::cout << "Client disconnected" << std::endl;
         }
-        })
-        .listen(8080, [](auto* token) {
-            if (token) {
-                std::cout << "Server started at ws://localhost:8080" << std::endl;
-            }
-            else {
-                std::cerr << "Failed to start server" << std::endl;
-            }
+    }).listen(8080, [](auto* token) {
+        if (token) {
+            std::cout << "Server started at ws://localhost:8080" << std::endl;
+        }
+        else {
+            std::cerr << "Failed to start server" << std::endl;
+        }
     }).run();
 
     return 0;
