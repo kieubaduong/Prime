@@ -4,6 +4,7 @@
 #include <thread>
 #include <vector>
 #include <memory>
+#include <atomic>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
@@ -46,27 +47,41 @@ static void ConvertAndSendImage(uWS::WebSocket<false, true, PerSocketData>* ws, 
 }
 
 int main() {
-    ScreenshotService screenshotService;
-    std::vector<unsigned char> buffer;
+    std::atomic<bool> running = false;
+    std::atomic<int> frame = 0;
 
     uWS::App().ws<PerSocketData>("/*", { 
         .compression = uWS::SHARED_COMPRESSOR,
         .maxPayloadLength = 16 * 1024 * 1024,
         .idleTimeout = 10,
         .maxBackpressure = 1 * 1024 * 1024,
-        .open = []([[maybe_unused]] auto* ws) {
+        .open = [&running, &frame]([[maybe_unused]] auto* ws) {
             std::cout << "Client connected" << std::endl;
-        },
-        .message = [&buffer, &screenshotService](auto* ws, [[maybe_unused]] std::string_view message, [[maybe_unused]] uWS::OpCode opCode) {
-            while (true) {
-                if (!CaptureAndCheckImage(screenshotService, buffer)) {
-                    break;
+
+            running = true;
+
+            std::thread([&ws, &running, &frame]() {
+                ScreenshotService screenshotService;
+                std::vector<unsigned char> buffer;
+
+                while (running) {
+                    if (!CaptureAndCheckImage(screenshotService, buffer)) {
+                        break;
+                    }
+
+                    ConvertAndSendImage(ws, buffer);
+
+                    frame++;
                 }
+            }).detach();
 
-                ConvertAndSendImage(ws, buffer);
-
-                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-            }
+            std::thread([&ws, &running, &frame]() {
+                while (running) {
+                    std::this_thread::sleep_for(std::chrono::seconds(1));
+                    std::cout << "FPS: " << frame << std::endl;
+                    frame = 0;
+                }
+            }).detach();
         },
         .close = []([[maybe_unused]] auto* ws, [[maybe_unused]] int code, [[maybe_unused]] std::string_view message) {
             std::cout << "Client disconnected" << std::endl;

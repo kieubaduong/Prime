@@ -1,4 +1,4 @@
-#include "../include/ScreenshotService.h"
+﻿#include "../include/ScreenshotService.h"
 #include "../include/ErrorHandling.h"
 
 #include <iostream>
@@ -56,12 +56,11 @@ std::vector<unsigned char> ScreenshotService::CaptureScreen() {
     IDXGIResource* desktopResource = nullptr;
 
     while (frameInfo.AccumulatedFrames == 0) {
-        std::cout << "No new frames accumulated." << std::endl;
         g_duplication->ReleaseFrame();
         hr = g_duplication->AcquireNextFrame(500, &frameInfo, &desktopResource);
         if (FAILED(hr)) {
             ErrorHandling::PrintError(hr, "Failed to acquire next frame");
-            return {};
+            continue;
         }
     }
 
