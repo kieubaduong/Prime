@@ -13,7 +13,7 @@ public:
     ScreenshotService();
     ~ScreenshotService();
 
-    std::vector<unsigned char> CaptureScreen();
+    bool GetNextFrame(std::vector<BYTE>& frameBuffer);
 
 private:
     ID3D11Device* g_device = nullptr;
@@ -27,4 +27,5 @@ private:
     void InitializeD3D();
     void CleanupD3D();
     
+    bool CaptureScreen(std::vector<BYTE>& frameBuffer);
 };

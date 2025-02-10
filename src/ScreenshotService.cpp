@@ -1,5 +1,6 @@
 ﻿#include "../include/ScreenshotService.h"
 #include "../include/ErrorHandling.h"
+#include "../include/Global.h"
 
 #include <iostream>
 #include <vector>
@@ -13,62 +14,69 @@
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
 
+bool ScreenshotService::GetNextFrame(std::vector<BYTE>& frameBuffer) {
+    if (!this->CaptureScreen(frameBuffer)) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        return false;
+    }
+
+    if (frameBuffer.empty()) {
+        std::cerr << "Failed to capture image" << std::endl;
+        return false;
+    }
+
+    if (frameBuffer.size() != static_cast<unsigned long long>(g_width) * g_height * g_channels) {
+        std::cerr << "Captured image has wrong size" << std::endl;
+        return false;
+    }
+
+    return true;
+}
+
 ScreenshotService::ScreenshotService() {
     InitializeD3D();
 }
 
 void ScreenshotService::InitializeD3D() {
-    try {
-        HRESULT hr = D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, 0,
-            nullptr, 0, D3D11_SDK_VERSION, &g_device, nullptr, &g_context);
-        ErrorHandling::CheckHR(hr, "Failed to create device and context");
+    HRESULT hr = D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, 0,
+        nullptr, 0, D3D11_SDK_VERSION, &g_device, nullptr, &g_context);
+    ErrorHandling::CheckHR(hr, "Failed to create device and context");
 
-        if (!g_device || !g_context) {
-            throw std::runtime_error("Failed to create device and context");
-        }
-
-        hr = g_device->QueryInterface(__uuidof(IDXGIDevice), (void**)&g_dxgiDevice);
-        ErrorHandling::CheckHR(hr, "Failed to query interface");
-
-        hr = g_dxgiDevice->GetAdapter(&g_adapter);
-        ErrorHandling::CheckHR(hr, "Failed to get adapter");
-
-        hr = g_adapter->EnumOutputs(0, &g_output);
-        ErrorHandling::CheckHR(hr, "Failed to get output");
-
-        hr = g_output->QueryInterface(__uuidof(IDXGIOutput1), (void**)&g_output1);
-        ErrorHandling::CheckHR(hr, "Failed to query interface");
-
-        hr = g_output1->DuplicateOutput(g_device, &g_duplication);
-        ErrorHandling::CheckHR(hr, "Failed to duplicate output");
+    if (!g_device || !g_context) {
+        throw std::runtime_error("Failed to create device and context");
     }
-    catch (...) {
-        std::cout << "Unknown error occurred" << std::endl;
-        CleanupD3D();
-    }
+
+    hr = g_device->QueryInterface(__uuidof(IDXGIDevice), (void**)&g_dxgiDevice);
+    ErrorHandling::CheckHR(hr, "Failed to query interface");
+
+    hr = g_dxgiDevice->GetAdapter(&g_adapter);
+    ErrorHandling::CheckHR(hr, "Failed to get adapter");
+
+    hr = g_adapter->EnumOutputs(0, &g_output);
+    ErrorHandling::CheckHR(hr, "Failed to get output");
+
+    hr = g_output->QueryInterface(__uuidof(IDXGIOutput1), (void**)&g_output1);
+    ErrorHandling::CheckHR(hr, "Failed to query interface");
+
+    hr = g_output1->DuplicateOutput(g_device, &g_duplication);
+    ErrorHandling::CheckHR(hr, "Failed to duplicate output");
 }
 
-std::vector<unsigned char> ScreenshotService::CaptureScreen() {
-    HRESULT hr = S_OK;
-
+bool ScreenshotService::CaptureScreen(std::vector<BYTE>& frameBuffer) {
     DXGI_OUTDUPL_FRAME_INFO frameInfo{};
-    frameInfo.AccumulatedFrames = 0;
     IDXGIResource* desktopResource = nullptr;
+    ID3D11Texture2D* frameTexture{};
 
-    while (frameInfo.AccumulatedFrames == 0) {
-        g_duplication->ReleaseFrame();
-        hr = g_duplication->AcquireNextFrame(500, &frameInfo, &desktopResource);
-        if (FAILED(hr)) {
-            ErrorHandling::PrintError(hr, "Failed to acquire next frame");
-            continue;
-        }
+    HRESULT hr = g_duplication->AcquireNextFrame(500, &frameInfo, &desktopResource);
+    if (FAILED(hr) || hr == DXGI_ERROR_WAIT_TIMEOUT) {
+        ErrorHandling::PrintError(hr, "Failed to acquire next frame");
+        return false;
     }
 
-    ID3D11Texture2D* frameTexture{};
     hr = desktopResource->QueryInterface(__uuidof(ID3D11Texture2D), (void**)&frameTexture);
     if (FAILED(hr)) {
         ErrorHandling::PrintError(hr, "Failed to query interface");
-        return {};
+        return false;
     }
 
     D3D11_TEXTURE2D_DESC desc = {};
@@ -82,7 +90,7 @@ std::vector<unsigned char> ScreenshotService::CaptureScreen() {
     hr = g_device->CreateTexture2D(&desc, nullptr, &stagingTexture);
     if (FAILED(hr)) {
         ErrorHandling::PrintError(hr, "Failed to create staging texture");
-        return {};
+        return false;
     }
 
     g_context->CopyResource(stagingTexture, frameTexture);
@@ -91,21 +99,32 @@ std::vector<unsigned char> ScreenshotService::CaptureScreen() {
     hr = g_context->Map(stagingTexture, 0, D3D11_MAP_READ, 0, &mappedResource);
     if (FAILED(hr)) {
         ErrorHandling::PrintError(hr, "Failed to map staging texture");
-        return {};
+        return false;
     }
 
-    auto const* data = reinterpret_cast<unsigned char*>(mappedResource.pData);
-    int rowPitch = mappedResource.RowPitch;
+    frameBuffer.resize(static_cast<size_t>(desc.Width) * desc.Height * 4);
+    auto const* src = reinterpret_cast<BYTE*>(mappedResource.pData);
+    auto* dst = frameBuffer.data();
 
-    std::vector<unsigned char> buffer(desc.Width * desc.Height * 4);
     for (UINT y = 0; y < desc.Height; ++y) {
-        memcpy(buffer.data() + y * desc.Width * 4, data + y * rowPitch, desc.Width * 4);
+        auto* srcRow = src + y * mappedResource.RowPitch;
+        auto* dstRow = dst + y * desc.Width * 4;
+
+        for (UINT x = 0; x < desc.Width; ++x) {
+            dstRow[x * 4 + 0] = srcRow[x * 4 + 2]; // R
+            dstRow[x * 4 + 1] = srcRow[x * 4 + 1]; // G
+            dstRow[x * 4 + 2] = srcRow[x * 4 + 0]; // B
+            dstRow[x * 4 + 3] = srcRow[x * 4 + 3]; // A
+        }
     }
 
     g_context->Unmap(stagingTexture, 0);
+    stagingTexture->Release();
+    frameTexture->Release();
+    desktopResource->Release();
     g_duplication->ReleaseFrame();
 
-    return buffer;
+    return true;
 }
 
 void ScreenshotService::CleanupD3D() {

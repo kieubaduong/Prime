@@ -6,82 +6,60 @@
 #include <memory>
 #include <atomic>
 
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include <stb_image_write.h>
 #include <uwebsockets/App.h>
 
 #include "include/ScreenshotService.h"
 #include "include/Global.h"
+#include "include/ImageConverter.hpp"
 
 struct PerSocketData {};
 
-static bool CaptureAndCheckImage(ScreenshotService& screenshotService, std::vector<unsigned char>& buffer) {
-    buffer = screenshotService.CaptureScreen();
+static void HandleClientConnection(uWS::WebSocket<false, true, PerSocketData>* ws, std::atomic<bool>& running, std::atomic<int>& frame) {
+    std::cout << "Client connected" << std::endl;
 
-    if (buffer.empty()) {
-        std::cerr << "Failed to capture image" << std::endl;
-        return false;
-    }
+    running = true;
 
-    if (buffer.size() != static_cast<unsigned long long>(g_width) * g_height * g_channels) {
-        std::cerr << "Captured image has wrong size" << std::endl;
-        return false;
-    }
+    std::jthread([&ws, &running, &frame]() {
+        ScreenshotService screenshotService;
+        std::vector<unsigned char> frameBuffer;
 
-    return true;
-}
+        while (running) {
+            if (!screenshotService.GetNextFrame(frameBuffer)) {
+                continue;
+            }
 
-static void ConvertAndSendImage(uWS::WebSocket<false, true, PerSocketData>* ws, const std::vector<unsigned char>& buffer) {
-    int png_size;
-    unsigned char* png_data = stbi_write_png_to_mem(buffer.data(), 0, g_width, g_height, g_channels, &png_size);
+            std::vector<unsigned char> jpgBuffer;
+            if (!ImageConverter::ToJPG(frameBuffer, jpgBuffer)) {
+                continue;
+            }
 
-    if (png_data) {
-        std::string_view png_view(reinterpret_cast<const char*>(png_data), png_size);
-        ws->send(png_view, uWS::BINARY);
-    }
-    else {
-        std::cerr << "Failed to convert image to PNG" << std::endl;
-    }
+            std::string_view jpeg_view(reinterpret_cast<const char*>(jpgBuffer.data()), jpgBuffer.size());
+            ws->send(jpeg_view, uWS::BINARY);
 
-    free(png_data);
+            frame++;
+        }
+    }).detach();
+
+    std::jthread([&ws, &running, &frame]() {
+        while (running) {
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            std::cout << "FPS: " << frame << std::endl;
+            frame = 0;
+        }
+    }).detach();
 }
 
 int main() {
     std::atomic<bool> running = false;
     std::atomic<int> frame = 0;
 
-    uWS::App().ws<PerSocketData>("/*", { 
+    uWS::App().ws<PerSocketData>("/*", {
         .compression = uWS::SHARED_COMPRESSOR,
-        .maxPayloadLength = 16 * 1024 * 1024,
-        .idleTimeout = 10,
-        .maxBackpressure = 1 * 1024 * 1024,
+        .maxPayloadLength = 16 * 1024 * 1024, // 16MB
+        .idleTimeout = 10, // 10 seconds
+        .maxBackpressure = 1 * 1024 * 1024, // 1MB
         .open = [&running, &frame]([[maybe_unused]] auto* ws) {
-            std::cout << "Client connected" << std::endl;
-
-            running = true;
-
-            std::thread([&ws, &running, &frame]() {
-                ScreenshotService screenshotService;
-                std::vector<unsigned char> buffer;
-
-                while (running) {
-                    if (!CaptureAndCheckImage(screenshotService, buffer)) {
-                        break;
-                    }
-
-                    ConvertAndSendImage(ws, buffer);
-
-                    frame++;
-                }
-            }).detach();
-
-            std::thread([&ws, &running, &frame]() {
-                while (running) {
-                    std::this_thread::sleep_for(std::chrono::seconds(1));
-                    std::cout << "FPS: " << frame << std::endl;
-                    frame = 0;
-                }
-            }).detach();
+            HandleClientConnection(ws, running, frame);
         },
         .close = []([[maybe_unused]] auto* ws, [[maybe_unused]] int code, [[maybe_unused]] std::string_view message) {
             std::cout << "Client disconnected" << std::endl;
