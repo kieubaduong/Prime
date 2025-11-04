@@ -2,6 +2,8 @@
 
 Prime is a C++ project that captures screenshots and serves them over a WebSocket connection. It uses DirectX for screen capturing and uWebSockets for WebSocket communication.
 
+https://github.com/user-attachments/assets/7461ea61-afc3-4d07-a150-f4c30dc56338
+
 ## Features
 
 - Capture screenshots using DirectX
