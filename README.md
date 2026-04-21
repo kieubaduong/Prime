@@ -44,7 +44,7 @@ https://github.com/user-attachments/assets/7461ea61-afc3-4d07-a150-f4c30dc56338
 
 - `Prime.cpp`: Main application file.
 - `ScreenshotService.h` and `ScreenshotService.cpp`: Handles screen capturing using DirectX.
-- `ErrorHandling.h` and `ErrorHandling.cpp`: Utility functions for error handling.
+- `Log.h` and `Log.cpp`: Simple logging utilities.
 - `httplib.h`: Header-only HTTP library used for additional HTTP functionalities.
 - `Prime.vcxproj` and `Prime.vcxproj.filters`: Visual Studio project files.
 

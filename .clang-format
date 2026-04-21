@@ -1,0 +1,7 @@
+BasedOnStyle: Google
+ColumnLimit: 150
+AllowShortFunctionsOnASingleLine: None
+InsertBraces: true
+BreakBeforeBraces: Custom
+BraceWrapping:
+  BeforeElse: true

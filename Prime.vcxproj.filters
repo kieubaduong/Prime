@@ -15,19 +15,22 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Prime.cpp">
+    <ClCompile Include="prime.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\ScreenshotService.cpp">
+    <ClCompile Include="src\screenshot_service.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\ErrorHandling.cpp">
+    <ClCompile Include="src\log.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\Global.cpp">
+    <ClCompile Include="src\global.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\ImageConverter.cpp">
+    <ClCompile Include="src\audio_streamer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\preview_window.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -35,21 +38,28 @@
     <None Include=".gitignore" />
     <None Include=".gitattributes" />
     <None Include="README.md" />
+    <None Include=".clang-format" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="include\ScreenshotService.h">
+    <ClInclude Include="include\screenshot_service.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\ErrorHandling.h">
+    <ClInclude Include="include\log.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\httplib.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\Global.h">
+    <ClInclude Include="include\global.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\ImageConverter.hpp">
+    <ClInclude Include="include\audio_streamer.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\result.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\preview_window.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

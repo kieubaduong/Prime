@@ -1,4 +1,4 @@
-#include "../include/Global.h"
+#include "../include/global.hpp"
 
 const int g_width = 1920;
 const int g_height = 1080;
