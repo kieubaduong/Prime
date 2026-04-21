@@ -20,43 +20,44 @@ static constexpr std::array kSupportedFormats = {
     DXGI_FORMAT_B8G8R8A8_UNORM,
 };
 
-std::optional<ScreenshotService> ScreenshotService::Create() {
+std::optional<ScreenshotService> ScreenshotService::Create(UINT adapterIndex, UINT monitorIndex) {
+  IDXGIFactory1* factory = nullptr;
+  HRESULT hr = CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)&factory);
+  if (FAILED(hr)) {
+    logger::error("Failed to create DXGI factory", hr);
+    return std::nullopt;
+  }
+
+  IDXGIAdapter1* adapter = nullptr;
+  hr = factory->EnumAdapters1(adapterIndex, &adapter);
+  factory->Release();
+  if (FAILED(hr)) {
+    logger::error("Failed to get adapter", hr);
+    return std::nullopt;
+  }
+
   ScreenshotService service;
-
-  HRESULT hr = D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, D3D11_CREATE_DEVICE_BGRA_SUPPORT, nullptr, 0, D3D11_SDK_VERSION,
-                                 &service.m_device, nullptr, &service.m_context);
+  // Driver type must be UNKNOWN when an explicit adapter is passed.
+  hr = D3D11CreateDevice(adapter, D3D_DRIVER_TYPE_UNKNOWN, nullptr, D3D11_CREATE_DEVICE_BGRA_SUPPORT, nullptr, 0, D3D11_SDK_VERSION,
+                         &service.m_device, nullptr, &service.m_context);
   if (FAILED(hr)) {
-    Log::Error("Failed to create device and context: " + Log::HRMessage(hr));
-    return std::nullopt;
-  }
-
-  IDXGIDevice* dxgiDevice = nullptr;
-  hr = service.m_device->QueryInterface(__uuidof(IDXGIDevice), (void**)&dxgiDevice);
-  if (FAILED(hr)) {
-    Log::Error("Failed to query IDXGIDevice: " + Log::HRMessage(hr));
-    return std::nullopt;
-  }
-
-  IDXGIAdapter* adapter = nullptr;
-  hr = dxgiDevice->GetAdapter(&adapter);
-  dxgiDevice->Release();
-  if (FAILED(hr)) {
-    Log::Error("Failed to get adapter: " + Log::HRMessage(hr));
+    adapter->Release();
+    logger::error("Failed to create device and context", hr);
     return std::nullopt;
   }
 
   IDXGIOutput* output = nullptr;
-  hr = adapter->EnumOutputs(0, &output);
+  hr = adapter->EnumOutputs(monitorIndex, &output);
   adapter->Release();
   if (FAILED(hr)) {
-    Log::Error("Failed to get output: " + Log::HRMessage(hr));
+    logger::error("Failed to get output", hr);
     return std::nullopt;
   }
 
   hr = output->QueryInterface(__uuidof(IDXGIOutput5), (void**)&service.m_output5);
   output->Release();
   if (FAILED(hr)) {
-    Log::Error("Failed to query IDXGIOutput5: " + Log::HRMessage(hr));
+    logger::error("Failed to query IDXGIOutput5", hr);
     return std::nullopt;
   }
 
@@ -73,10 +74,10 @@ bool ScreenshotService::CreateDuplication() {
     return true;
   }
 
-  Log::Info("DuplicateOutput1 not supported, falling back to DuplicateOutput: " + Log::HRMessage(hr));
+  logger::warn("DuplicateOutput1 not supported, falling back to DuplicateOutput", hr);
   hr = m_output5->DuplicateOutput(m_device, &m_duplication);
   if (FAILED(hr)) {
-    Log::Error("Failed to duplicate output: " + Log::HRMessage(hr));
+    logger::error("Failed to duplicate output", hr);
     return false;
   }
 
@@ -92,7 +93,7 @@ ID3D11Texture2D* ScreenshotService::CaptureScreen() {
   }
 
   if (hr == DXGI_ERROR_ACCESS_LOST) {
-    Log::Info("Desktop duplication access lost, re-creating...");
+    logger::info("Desktop duplication access lost, re-creating...");
     if (m_duplication) {
       m_duplication->Release();
       m_duplication = nullptr;
@@ -103,13 +104,13 @@ ID3D11Texture2D* ScreenshotService::CaptureScreen() {
   }
 
   if (FAILED(hr)) {
-    Log::Error("Failed to acquire next frame: " + Log::HRMessage(hr));
+    logger::error("Failed to acquire next frame", hr);
     return nullptr;
   }
 
   hr = m_desktopResource->QueryInterface(__uuidof(ID3D11Texture2D), (void**)&m_frameTexture);
   if (FAILED(hr)) {
-    Log::Error("Failed to query interface: " + Log::HRMessage(hr));
+    logger::error("Failed to query interface", hr);
     m_desktopResource->Release();
     m_desktopResource = nullptr;
     m_duplication->ReleaseFrame();

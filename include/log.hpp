@@ -2,13 +2,14 @@
 
 #include <Windows.h>
 
-#include <string>
+#include <optional>
 #include <string_view>
 
-namespace Log {
+namespace logger {
 
-void Info(std::string_view message);
-void Error(std::string_view message);
-std::string HRMessage(HRESULT hr);
+void enable_virtual_terminal();
+void info(std::string_view message, std::optional<HRESULT> hr = std::nullopt);
+void warn(std::string_view message, std::optional<HRESULT> hr = std::nullopt);
+void error(std::string_view message, std::optional<HRESULT> hr = std::nullopt);
 
-}  // namespace Log
+}  // namespace logger

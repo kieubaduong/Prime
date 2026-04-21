@@ -9,7 +9,7 @@
 
 class ScreenshotService {
  public:
-  static std::optional<ScreenshotService> Create();
+  static std::optional<ScreenshotService> Create(UINT adapterIndex = 0, UINT monitorIndex = 0);
 
   ~ScreenshotService();
 

@@ -137,6 +137,7 @@
     <ClCompile Include="prime.cpp" />
     <ClCompile Include="src\screenshot_service.cpp" />
     <ClCompile Include="src\audio_streamer.cpp" />
+    <ClCompile Include="src\monitor_picker.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />
@@ -153,6 +154,7 @@
     <ClInclude Include="include\result.hpp" />
     <ClInclude Include="include\screenshot_service.hpp" />
     <ClInclude Include="include\audio_streamer.hpp" />
+    <ClInclude Include="include\monitor_picker.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include <format>
+#include <optional>
 
 #include "../include/log.hpp"
 
@@ -150,7 +151,7 @@ bool PreviewWindow::CreateWindowAndSwapChain() {
                           rect.bottom - rect.top, nullptr, nullptr, wc.hInstance, this);
 
   if (!m_hwnd) {
-    Log::Error("Failed to create preview window");
+    logger::error("Failed to create preview window");
     return false;
   }
 
@@ -178,7 +179,7 @@ bool PreviewWindow::CreateWindowAndSwapChain() {
   dxgiDevice->Release();
 
   if (FAILED(hr)) {
-    Log::Error("Failed to create swap chain: " + Log::HRMessage(hr));
+    logger::error("Failed to create swap chain", hr);
     return false;
   }
 
@@ -194,7 +195,7 @@ bool PreviewWindow::CreateShaders() {
   HRESULT hr = D3DCompile(kShaderSource, strlen(kShaderSource), nullptr, nullptr, nullptr, "VS", "vs_5_0", 0, 0, &vsBlob, &errorBlob);
   if (FAILED(hr)) {
     if (errorBlob) {
-      Log::Error(std::format("VS compile: {}", (char*)errorBlob->GetBufferPointer()));
+      logger::error(std::format("VS compile: {}", (char*)errorBlob->GetBufferPointer()));
       errorBlob->Release();
     }
     return false;
@@ -203,7 +204,7 @@ bool PreviewWindow::CreateShaders() {
   hr = D3DCompile(kShaderSource, strlen(kShaderSource), nullptr, nullptr, nullptr, "PS", "ps_5_0", 0, 0, &psBlob, &errorBlob);
   if (FAILED(hr)) {
     if (errorBlob) {
-      Log::Error(std::format("PS compile: {}", (char*)errorBlob->GetBufferPointer()));
+      logger::error(std::format("PS compile: {}", (char*)errorBlob->GetBufferPointer()));
       errorBlob->Release();
     }
     vsBlob->Release();
@@ -214,14 +215,14 @@ bool PreviewWindow::CreateShaders() {
   vsBlob->Release();
   if (FAILED(hr)) {
     psBlob->Release();
-    Log::Error("Failed to create vertex shader: " + Log::HRMessage(hr));
+    logger::error("Failed to create vertex shader", hr);
     return false;
   }
 
   hr = m_device->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, &m_ps);
   psBlob->Release();
   if (FAILED(hr)) {
-    Log::Error("Failed to create pixel shader: " + Log::HRMessage(hr));
+    logger::error("Failed to create pixel shader", hr);
     return false;
   }
 
@@ -237,7 +238,7 @@ bool PreviewWindow::CreateSampler() {
 
   HRESULT hr = m_device->CreateSamplerState(&sd, &m_sampler);
   if (FAILED(hr)) {
-    Log::Error("Failed to create sampler: " + Log::HRMessage(hr));
+    logger::error("Failed to create sampler", hr);
     return false;
   }
   return true;
@@ -247,14 +248,14 @@ bool PreviewWindow::CreateRTV() {
   ID3D11Texture2D* backBuffer = nullptr;
   HRESULT hr = m_swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&backBuffer);
   if (FAILED(hr)) {
-    Log::Error("Failed to get back buffer: " + Log::HRMessage(hr));
+    logger::error("Failed to get back buffer", hr);
     return false;
   }
 
   hr = m_device->CreateRenderTargetView(backBuffer, nullptr, &m_rtv);
   backBuffer->Release();
   if (FAILED(hr)) {
-    Log::Error("Failed to create RTV: " + Log::HRMessage(hr));
+    logger::error("Failed to create RTV", hr);
     return false;
   }
   return true;
@@ -271,7 +272,7 @@ void PreviewWindow::ResizeSwapChain() {
   m_resizeNeeded = false;
 }
 
-bool PreviewWindow::Present(ID3D11Texture2D* capturedTexture) {
+void PreviewWindow::Present(ID3D11Texture2D* capturedTexture) {
   if (m_resizeNeeded) {
     ResizeSwapChain();
   }
@@ -287,8 +288,8 @@ bool PreviewWindow::Present(ID3D11Texture2D* capturedTexture) {
 
   HRESULT hr = m_device->CreateShaderResourceView(capturedTexture, &srvDesc, &srv);
   if (FAILED(hr)) {
-    Log::Error("Failed to create SRV: " + Log::HRMessage(hr));
-    return false;
+    logger::error("Failed to create SRV", hr);
+    return;
   }
 
   DXGI_SWAP_CHAIN_DESC scDesc{};
@@ -311,7 +312,6 @@ bool PreviewWindow::Present(ID3D11Texture2D* capturedTexture) {
   m_swapChain->Present(1, 0);
 
   srv->Release();
-  return true;
 }
 
 bool PreviewWindow::PumpMessages() const {

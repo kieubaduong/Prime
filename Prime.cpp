@@ -1,24 +1,29 @@
 #include <d3d11.h>
 
 #include <chrono>
+#include <optional>
 #include <thread>
 
 #include "include/log.hpp"
+#include "include/monitor_picker.hpp"
 #include "include/preview_window.hpp"
 #include "include/screenshot_service.hpp"
 
 int main() {
-  auto screenshotService = ScreenshotService::Create();
+  logger::enable_virtual_terminal();
+
+  monitor_picker::MonitorSelection selection = monitor_picker::choose();
+  std::optional<ScreenshotService> screenshotService = ScreenshotService::Create(selection.adapterIndex, selection.monitorIndex);
   if (!screenshotService) {
     return 1;
   }
 
-  auto preview = PreviewWindow::Create(screenshotService->GetDevice(), screenshotService->GetContext());
+  std::optional<PreviewWindow> preview = PreviewWindow::Create(screenshotService->GetDevice(), screenshotService->GetContext());
   if (!preview) {
     return 1;
   }
 
-  Log::Info("Starting capture loop...");
+  logger::info("Starting capture loop...");
 
   while (preview->PumpMessages()) {
     ID3D11Texture2D* texture = screenshotService->CaptureScreen();

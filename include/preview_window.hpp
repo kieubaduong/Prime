@@ -18,7 +18,7 @@ class PreviewWindow {
   PreviewWindow(const PreviewWindow&) = delete;
   PreviewWindow& operator=(const PreviewWindow&) = delete;
 
-  bool Present(ID3D11Texture2D* capturedTexture);
+  void Present(ID3D11Texture2D* capturedTexture);
   bool PumpMessages() const;
 
  private:
