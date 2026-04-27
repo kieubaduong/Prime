@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Source Files">
@@ -15,7 +15,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="prime.cpp">
+    <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\screenshot_service.cpp">
@@ -36,13 +36,6 @@
     <ClCompile Include="src\monitor_picker.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include=".gitignore" />
-    <None Include=".gitattributes" />
-    <None Include="README.md" />
-    <None Include=".clang-format" />
-    <None Include="Prime.code-workspace" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\screenshot_service.hpp">

@@ -22,7 +22,7 @@
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{9fe5e270-efbc-4b5f-93e3-9c3090e477a8}</ProjectGuid>
-    <RootNamespace>Prime</RootNamespace>
+    <RootNamespace>Core</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -134,17 +134,10 @@
     <ClCompile Include="src\global.cpp" />
     <ClCompile Include="src\log.cpp" />
     <ClCompile Include="src\preview_window.cpp" />
-    <ClCompile Include="prime.cpp" />
+    <ClCompile Include="main.cpp" />
     <ClCompile Include="src\screenshot_service.cpp" />
     <ClCompile Include="src\audio_streamer.cpp" />
     <ClCompile Include="src\monitor_picker.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include=".clang-format" />
-    <None Include=".gitattributes" />
-    <None Include=".gitignore" />
-    <None Include="Prime.code-workspace" />
-    <None Include="README.md" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\global.hpp" />

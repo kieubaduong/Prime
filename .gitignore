@@ -1758,3 +1758,6 @@ Backup*/
 UpgradeLog*.XML
 UpgradeLog*.htm
 ServiceFabricBackup
+# Claude / Serena tooling
+.claude/
+.serena/
