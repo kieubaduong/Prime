@@ -1,9 +1,11 @@
 #pragma once
 
+#include <Windows.h>
 #include <d3d11.h>
 #include <dxgi.h>
 #include <dxgi1_2.h>
 #include <dxgi1_5.h>
+#include <wrl/client.h>
 
 #include <optional>
 
@@ -11,10 +13,8 @@ class ScreenshotService {
  public:
   static std::optional<ScreenshotService> Create(UINT adapterIndex = 0, UINT monitorIndex = 0);
 
-  ~ScreenshotService();
-
-  ScreenshotService(ScreenshotService&& other) noexcept;
-  ScreenshotService& operator=(ScreenshotService&& other) noexcept;
+  ScreenshotService(ScreenshotService&& other) noexcept = default;
+  ScreenshotService& operator=(ScreenshotService&& other) noexcept = default;
 
   ScreenshotService(const ScreenshotService&) = delete;
   ScreenshotService& operator=(const ScreenshotService&) = delete;
@@ -22,20 +22,23 @@ class ScreenshotService {
   ID3D11Texture2D* CaptureScreen();
   void ReleaseFrameTexture();
 
-  ID3D11Device* GetDevice() const { return m_device; }
-  ID3D11DeviceContext* GetContext() const { return m_context; }
+  ID3D11Device* GetDevice() const {
+    return m_device.Get();
+  }
+  ID3D11DeviceContext* GetContext() const {
+    return m_context.Get();
+  }
 
  private:
   ScreenshotService() = default;
 
-  ID3D11Device* m_device = nullptr;
-  ID3D11DeviceContext* m_context = nullptr;
-  IDXGIOutput5* m_output5 = nullptr;
-  IDXGIOutputDuplication* m_duplication = nullptr;
+  Microsoft::WRL::ComPtr<ID3D11Device> m_device;
+  Microsoft::WRL::ComPtr<ID3D11DeviceContext> m_context;
+  Microsoft::WRL::ComPtr<IDXGIOutput5> m_output5;
+  Microsoft::WRL::ComPtr<IDXGIOutputDuplication> m_duplication;
 
-  IDXGIResource* m_desktopResource = nullptr;
-  ID3D11Texture2D* m_frameTexture = nullptr;
+  Microsoft::WRL::ComPtr<IDXGIResource> m_desktopResource;
+  Microsoft::WRL::ComPtr<ID3D11Texture2D> m_frameTexture;
 
   bool CreateDuplication();
-  void Cleanup();
 };

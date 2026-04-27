@@ -151,7 +151,6 @@
     <ClInclude Include="include\httplib.h" />
     <ClInclude Include="include\log.hpp" />
     <ClInclude Include="include\preview_window.hpp" />
-    <ClInclude Include="include\result.hpp" />
     <ClInclude Include="include\screenshot_service.hpp" />
     <ClInclude Include="include\audio_streamer.hpp" />
     <ClInclude Include="include\monitor_picker.hpp" />

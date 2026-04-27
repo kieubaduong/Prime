@@ -2,9 +2,9 @@
 
 #include <Windows.h>
 #include <conio.h>
-#include <d3d11.h>
 #include <dxgi.h>
 #include <wchar.h>
+#include <wrl/client.h>
 
 #include <iostream>
 #include <string>
@@ -16,21 +16,23 @@
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
 
+using Microsoft::WRL::ComPtr;
+
 namespace {
 
 struct MonitorInfo {
-  UINT adapterIndex;
-  UINT monitorIndex;
+  UINT adapterIndex = 0;
+  UINT monitorIndex = 0;
   std::string deviceName;
-  int width;
-  int height;
-  int x;
-  int y;
+  int width = 0;
+  int height = 0;
+  int x = 0;
+  int y = 0;
 };
 
 std::vector<MonitorInfo> EnumerateMonitors() {
-  IDXGIFactory1* factory = nullptr;
-  HRESULT hr = CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)&factory);
+  ComPtr<IDXGIFactory1> factory;
+  HRESULT hr = CreateDXGIFactory1(IID_PPV_ARGS(factory.GetAddressOf()));
   if (FAILED(hr)) {
     logger::error("monitor_picker: failed to create DXGI factory", hr);
     return {};
@@ -38,20 +40,19 @@ std::vector<MonitorInfo> EnumerateMonitors() {
 
   std::vector<MonitorInfo> monitors;
   for (UINT adapterIndex = 0;; ++adapterIndex) {
-    IDXGIAdapter1* adapter = nullptr;
-    if (factory->EnumAdapters1(adapterIndex, &adapter) != S_OK) {
+    ComPtr<IDXGIAdapter1> adapter;
+    if (FAILED(factory->EnumAdapters1(adapterIndex, adapter.GetAddressOf()))) {
       break;
     }
 
     for (UINT monitorIndex = 0;; ++monitorIndex) {
-      IDXGIOutput* output = nullptr;
-      if (adapter->EnumOutputs(monitorIndex, &output) != S_OK) {
+      ComPtr<IDXGIOutput> output;
+      if (FAILED(adapter->EnumOutputs(monitorIndex, output.GetAddressOf()))) {
         break;
       }
 
       DXGI_OUTPUT_DESC desc{};
       output->GetDesc(&desc);
-      output->Release();
 
       MonitorInfo info;
       info.adapterIndex = adapterIndex;
@@ -63,11 +64,8 @@ std::vector<MonitorInfo> EnumerateMonitors() {
       info.height = desc.DesktopCoordinates.bottom - desc.DesktopCoordinates.top;
       monitors.push_back(std::move(info));
     }
-
-    adapter->Release();
   }
 
-  factory->Release();
   return monitors;
 }
 
@@ -76,12 +74,11 @@ void PrintList(const std::vector<MonitorInfo>& monitors, UINT selected) {
     const MonitorInfo& monitor = monitors[i];
     std::cout << "\o{33}[K";
     if (i == selected) {
-      std::cout << "\o{33}[36m> " << monitor.deviceName << "  " << monitor.width << "x" << monitor.height << " @ (" << monitor.x << ","
-                << monitor.y << ")\o{33}[0m\n";
+      std::cout << "\o{33}[36m> " << monitor.deviceName << "  " << monitor.width << "x" << monitor.height << " @ (" << monitor.x << "," << monitor.y
+                << ")\o{33}[0m\n";
     }
     else {
-      std::cout << "  " << monitor.deviceName << "  " << monitor.width << "x" << monitor.height << " @ (" << monitor.x << "," << monitor.y
-                << ")\n";
+      std::cout << "  " << monitor.deviceName << "  " << monitor.width << "x" << monitor.height << " @ (" << monitor.x << "," << monitor.y << ")\n";
     }
   }
 }

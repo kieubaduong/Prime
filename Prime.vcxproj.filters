@@ -42,6 +42,7 @@
     <None Include=".gitattributes" />
     <None Include="README.md" />
     <None Include=".clang-format" />
+    <None Include="Prime.code-workspace" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\screenshot_service.hpp">
@@ -57,9 +58,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\audio_streamer.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="include\result.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\preview_window.hpp">
