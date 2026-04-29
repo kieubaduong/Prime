@@ -1,6 +1,5 @@
 #pragma once
 
-#include <Windows.h>
 #include <d3d11.h>
 #include <dxgi.h>
 #include <dxgi1_2.h>
@@ -9,9 +8,11 @@
 
 #include <optional>
 
+#include "monitor_picker.hpp"
+
 class ScreenshotService {
  public:
-  static std::optional<ScreenshotService> Create(UINT adapterIndex = 0, UINT monitorIndex = 0);
+  static std::optional<ScreenshotService> Create(const monitor_picker::MonitorSelection& selection);
 
   ScreenshotService(ScreenshotService&& other) noexcept = default;
   ScreenshotService& operator=(ScreenshotService&& other) noexcept = default;
@@ -40,5 +41,5 @@ class ScreenshotService {
   Microsoft::WRL::ComPtr<IDXGIResource> m_desktopResource;
   Microsoft::WRL::ComPtr<ID3D11Texture2D> m_frameTexture;
 
-  bool CreateDuplication();
+  static Microsoft::WRL::ComPtr<IDXGIOutputDuplication> CreateDuplication(IDXGIOutput5* output, ID3D11Device* device);
 };

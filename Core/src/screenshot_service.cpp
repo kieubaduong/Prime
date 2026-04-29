@@ -13,17 +13,14 @@
 #include <optional>
 
 #include "../include/log.hpp"
+#include "../include/monitor_picker.hpp"
 
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
 
 using Microsoft::WRL::ComPtr;
 
-static constexpr std::array kSupportedFormats = {
-    DXGI_FORMAT_B8G8R8A8_UNORM,
-};
-
-std::optional<ScreenshotService> ScreenshotService::Create(UINT adapterIndex, UINT monitorIndex) {
+std::optional<ScreenshotService> ScreenshotService::Create(const monitor_picker::MonitorSelection& selection) {
   ComPtr<IDXGIFactory1> factory;
   HRESULT hr = CreateDXGIFactory1(IID_PPV_ARGS(factory.GetAddressOf()));
   if (FAILED(hr)) {
@@ -32,7 +29,7 @@ std::optional<ScreenshotService> ScreenshotService::Create(UINT adapterIndex, UI
   }
 
   ComPtr<IDXGIAdapter1> adapter;
-  hr = factory->EnumAdapters1(adapterIndex, adapter.GetAddressOf());
+  hr = factory->EnumAdapters1(selection.adapterIndex, adapter.GetAddressOf());
   if (FAILED(hr)) {
     logger::error("Failed to get adapter", hr);
     return std::nullopt;
@@ -48,7 +45,7 @@ std::optional<ScreenshotService> ScreenshotService::Create(UINT adapterIndex, UI
   }
 
   ComPtr<IDXGIOutput> output;
-  hr = adapter->EnumOutputs(monitorIndex, output.GetAddressOf());
+  hr = adapter->EnumOutputs(selection.monitorIndex, output.GetAddressOf());
   if (FAILED(hr)) {
     logger::error("Failed to get output", hr);
     return std::nullopt;
@@ -60,28 +57,34 @@ std::optional<ScreenshotService> ScreenshotService::Create(UINT adapterIndex, UI
     return std::nullopt;
   }
 
-  if (!service.CreateDuplication()) {
+  service.m_duplication = CreateDuplication(service.m_output5.Get(), service.m_device.Get());
+  if (!service.m_duplication) {
     return std::nullopt;
   }
 
   return service;
 }
 
-bool ScreenshotService::CreateDuplication() {
-  HRESULT hr = m_output5->DuplicateOutput1(m_device.Get(), 0, static_cast<UINT>(kSupportedFormats.size()), kSupportedFormats.data(),
-                                           m_duplication.ReleaseAndGetAddressOf());
+ComPtr<IDXGIOutputDuplication> ScreenshotService::CreateDuplication(IDXGIOutput5* output, ID3D11Device* device) {
+  static constexpr std::array kSupportedFormats = {
+      DXGI_FORMAT_B8G8R8A8_UNORM,
+  };
+
+  ComPtr<IDXGIOutputDuplication> duplication;
+  HRESULT hr = output->DuplicateOutput1(device, 0, static_cast<UINT>(kSupportedFormats.size()), kSupportedFormats.data(),
+                                        duplication.GetAddressOf());
   if (SUCCEEDED(hr)) {
-    return true;
+    return duplication;
   }
 
   logger::warn("DuplicateOutput1 not supported, falling back to DuplicateOutput", hr);
-  hr = m_output5->DuplicateOutput(m_device.Get(), m_duplication.ReleaseAndGetAddressOf());
+  hr = output->DuplicateOutput(device, duplication.ReleaseAndGetAddressOf());
   if (FAILED(hr)) {
     logger::error("Failed to duplicate output", hr);
-    return false;
+    return {};
   }
 
-  return true;
+  return duplication;
 }
 
 ID3D11Texture2D* ScreenshotService::CaptureScreen() {
@@ -94,8 +97,7 @@ ID3D11Texture2D* ScreenshotService::CaptureScreen() {
 
   if (hr == DXGI_ERROR_ACCESS_LOST) {
     logger::info("Desktop duplication access lost, re-creating...");
-    m_duplication.Reset();
-    CreateDuplication();
+    m_duplication = CreateDuplication(m_output5.Get(), m_device.Get());
     return nullptr;
   }
 

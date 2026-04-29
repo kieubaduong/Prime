@@ -136,7 +136,6 @@
     <ClCompile Include="src\preview_window.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="src\screenshot_service.cpp" />
-    <ClCompile Include="src\audio_streamer.cpp" />
     <ClCompile Include="src\monitor_picker.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -145,7 +144,6 @@
     <ClInclude Include="include\log.hpp" />
     <ClInclude Include="include\preview_window.hpp" />
     <ClInclude Include="include\screenshot_service.hpp" />
-    <ClInclude Include="include\audio_streamer.hpp" />
     <ClInclude Include="include\monitor_picker.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

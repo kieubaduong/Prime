@@ -13,7 +13,7 @@ int main() {
   logger::enable_virtual_terminal();
 
   monitor_picker::MonitorSelection selection = monitor_picker::choose();
-  std::optional<ScreenshotService> screenshotService = ScreenshotService::Create(selection.adapterIndex, selection.monitorIndex);
+  std::optional<ScreenshotService> screenshotService = ScreenshotService::Create(selection);
   if (!screenshotService) {
     return 1;
   }
