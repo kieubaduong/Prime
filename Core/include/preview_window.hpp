@@ -3,6 +3,7 @@
 #include <Windows.h>
 #include <d3d11.h>
 #include <dxgi.h>
+#include <wrl/client.h>
 
 #include <optional>
 
@@ -25,13 +26,13 @@ class PreviewWindow {
   PreviewWindow() = default;
 
   HWND m_hwnd = nullptr;
-  IDXGISwapChain* m_swapChain = nullptr;
-  ID3D11RenderTargetView* m_rtv = nullptr;
-  ID3D11VertexShader* m_vs = nullptr;
-  ID3D11PixelShader* m_ps = nullptr;
-  ID3D11SamplerState* m_sampler = nullptr;
-  ID3D11Device* m_device = nullptr;
-  ID3D11DeviceContext* m_context = nullptr;
+  Microsoft::WRL::ComPtr<IDXGISwapChain> m_swapChain;
+  Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_rtv;
+  Microsoft::WRL::ComPtr<ID3D11VertexShader> m_vs;
+  Microsoft::WRL::ComPtr<ID3D11PixelShader> m_ps;
+  Microsoft::WRL::ComPtr<ID3D11SamplerState> m_sampler;
+  Microsoft::WRL::ComPtr<ID3D11Device> m_device;
+  Microsoft::WRL::ComPtr<ID3D11DeviceContext> m_context;
   bool m_resizeNeeded = false;
 
   bool CreateWindowAndSwapChain();

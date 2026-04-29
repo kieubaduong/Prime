@@ -7,15 +7,19 @@
 #include <dxgi.h>
 #include <dxgiformat.h>
 #include <string.h>
+#include <wrl/client.h>
 
 #include <format>
 #include <optional>
+#include <utility>
 
 #include "../include/log.hpp"
 
+using Microsoft::WRL::ComPtr;
+
 #pragma comment(lib, "d3dcompiler.lib")
 
-static const char* kShaderSource = R"(
+static const char* const kShaderSource = R"(
 Texture2D tex : register(t0);
 SamplerState samp : register(s0);
 
@@ -63,22 +67,15 @@ PreviewWindow::~PreviewWindow() {
 
 PreviewWindow::PreviewWindow(PreviewWindow&& other) noexcept
     : m_hwnd(other.m_hwnd),
-      m_swapChain(other.m_swapChain),
-      m_rtv(other.m_rtv),
-      m_vs(other.m_vs),
-      m_ps(other.m_ps),
-      m_sampler(other.m_sampler),
-      m_device(other.m_device),
-      m_context(other.m_context),
+      m_swapChain(std::move(other.m_swapChain)),
+      m_rtv(std::move(other.m_rtv)),
+      m_vs(std::move(other.m_vs)),
+      m_ps(std::move(other.m_ps)),
+      m_sampler(std::move(other.m_sampler)),
+      m_device(std::move(other.m_device)),
+      m_context(std::move(other.m_context)),
       m_resizeNeeded(other.m_resizeNeeded) {
   other.m_hwnd = nullptr;
-  other.m_swapChain = nullptr;
-  other.m_rtv = nullptr;
-  other.m_vs = nullptr;
-  other.m_ps = nullptr;
-  other.m_sampler = nullptr;
-  other.m_device = nullptr;
-  other.m_context = nullptr;
   // Update GWLP_USERDATA to point to this instead of other
   if (m_hwnd) {
     SetWindowLongPtr(m_hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
@@ -89,22 +86,15 @@ PreviewWindow& PreviewWindow::operator=(PreviewWindow&& other) noexcept {
   if (this != &other) {
     Cleanup();
     m_hwnd = other.m_hwnd;
-    m_swapChain = other.m_swapChain;
-    m_rtv = other.m_rtv;
-    m_vs = other.m_vs;
-    m_ps = other.m_ps;
-    m_sampler = other.m_sampler;
-    m_device = other.m_device;
-    m_context = other.m_context;
-    m_resizeNeeded = other.m_resizeNeeded;
     other.m_hwnd = nullptr;
-    other.m_swapChain = nullptr;
-    other.m_rtv = nullptr;
-    other.m_vs = nullptr;
-    other.m_ps = nullptr;
-    other.m_sampler = nullptr;
-    other.m_device = nullptr;
-    other.m_context = nullptr;
+    m_swapChain = std::move(other.m_swapChain);
+    m_rtv = std::move(other.m_rtv);
+    m_vs = std::move(other.m_vs);
+    m_ps = std::move(other.m_ps);
+    m_sampler = std::move(other.m_sampler);
+    m_device = std::move(other.m_device);
+    m_context = std::move(other.m_context);
+    m_resizeNeeded = other.m_resizeNeeded;
     if (m_hwnd) {
       SetWindowLongPtr(m_hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
     }
@@ -155,12 +145,12 @@ bool PreviewWindow::CreateWindowAndSwapChain() {
     return false;
   }
 
-  IDXGIDevice* dxgiDevice = nullptr;
-  m_device->QueryInterface(__uuidof(IDXGIDevice), (void**)&dxgiDevice);
-  IDXGIAdapter* adapter = nullptr;
-  dxgiDevice->GetAdapter(&adapter);
-  IDXGIFactory* factory = nullptr;
-  adapter->GetParent(__uuidof(IDXGIFactory), (void**)&factory);
+  ComPtr<IDXGIDevice> dxgiDevice;
+  m_device.As(&dxgiDevice);
+  ComPtr<IDXGIAdapter> adapter;
+  dxgiDevice->GetAdapter(adapter.GetAddressOf());
+  ComPtr<IDXGIFactory> factory;
+  adapter->GetParent(IID_PPV_ARGS(factory.GetAddressOf()));
 
   DXGI_SWAP_CHAIN_DESC sd{};
   sd.BufferCount = 2;
@@ -173,11 +163,7 @@ bool PreviewWindow::CreateWindowAndSwapChain() {
   sd.Windowed = TRUE;
   sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 
-  HRESULT hr = factory->CreateSwapChain(m_device, &sd, &m_swapChain);
-  factory->Release();
-  adapter->Release();
-  dxgiDevice->Release();
-
+  HRESULT hr = factory->CreateSwapChain(m_device.Get(), &sd, m_swapChain.ReleaseAndGetAddressOf());
   if (FAILED(hr)) {
     logger::error("Failed to create swap chain", hr);
     return false;
@@ -188,39 +174,41 @@ bool PreviewWindow::CreateWindowAndSwapChain() {
 }
 
 bool PreviewWindow::CreateShaders() {
-  ID3DBlob* vsBlob = nullptr;
-  ID3DBlob* psBlob = nullptr;
-  ID3DBlob* errorBlob = nullptr;
+  ComPtr<ID3DBlob> vsBlob;
+  ComPtr<ID3DBlob> psBlob;
+  ComPtr<ID3DBlob> errorBlob;
 
-  HRESULT hr = D3DCompile(kShaderSource, strlen(kShaderSource), nullptr, nullptr, nullptr, "VS", "vs_5_0", 0, 0, &vsBlob, &errorBlob);
+  HRESULT hr = D3DCompile(kShaderSource, strlen(kShaderSource), nullptr, nullptr, nullptr, "VS", "vs_5_0", 0, 0, vsBlob.ReleaseAndGetAddressOf(),
+                          errorBlob.ReleaseAndGetAddressOf());
   if (FAILED(hr)) {
     if (errorBlob) {
-      logger::error(std::format("VS compile: {}", (char*)errorBlob->GetBufferPointer()));
-      errorBlob->Release();
+      logger::error(std::format("VS compile: {}", static_cast<const char*>(errorBlob->GetBufferPointer())));
+    }
+    else {
+      logger::error("VS compile failed", hr);
     }
     return false;
   }
 
-  hr = D3DCompile(kShaderSource, strlen(kShaderSource), nullptr, nullptr, nullptr, "PS", "ps_5_0", 0, 0, &psBlob, &errorBlob);
+  hr = D3DCompile(kShaderSource, strlen(kShaderSource), nullptr, nullptr, nullptr, "PS", "ps_5_0", 0, 0, psBlob.ReleaseAndGetAddressOf(),
+                  errorBlob.ReleaseAndGetAddressOf());
   if (FAILED(hr)) {
     if (errorBlob) {
-      logger::error(std::format("PS compile: {}", (char*)errorBlob->GetBufferPointer()));
-      errorBlob->Release();
+      logger::error(std::format("PS compile: {}", static_cast<const char*>(errorBlob->GetBufferPointer())));
     }
-    vsBlob->Release();
+    else {
+      logger::error("PS compile failed", hr);
+    }
     return false;
   }
 
-  hr = m_device->CreateVertexShader(vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), nullptr, &m_vs);
-  vsBlob->Release();
+  hr = m_device->CreateVertexShader(vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), nullptr, m_vs.ReleaseAndGetAddressOf());
   if (FAILED(hr)) {
-    psBlob->Release();
     logger::error("Failed to create vertex shader", hr);
     return false;
   }
 
-  hr = m_device->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, &m_ps);
-  psBlob->Release();
+  hr = m_device->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, m_ps.ReleaseAndGetAddressOf());
   if (FAILED(hr)) {
     logger::error("Failed to create pixel shader", hr);
     return false;
@@ -236,7 +224,7 @@ bool PreviewWindow::CreateSampler() {
   sd.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
   sd.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
 
-  HRESULT hr = m_device->CreateSamplerState(&sd, &m_sampler);
+  HRESULT hr = m_device->CreateSamplerState(&sd, m_sampler.ReleaseAndGetAddressOf());
   if (FAILED(hr)) {
     logger::error("Failed to create sampler", hr);
     return false;
@@ -245,15 +233,14 @@ bool PreviewWindow::CreateSampler() {
 }
 
 bool PreviewWindow::CreateRTV() {
-  ID3D11Texture2D* backBuffer = nullptr;
-  HRESULT hr = m_swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&backBuffer);
+  ComPtr<ID3D11Texture2D> backBuffer;
+  HRESULT hr = m_swapChain->GetBuffer(0, IID_PPV_ARGS(backBuffer.GetAddressOf()));
   if (FAILED(hr)) {
     logger::error("Failed to get back buffer", hr);
     return false;
   }
 
-  hr = m_device->CreateRenderTargetView(backBuffer, nullptr, &m_rtv);
-  backBuffer->Release();
+  hr = m_device->CreateRenderTargetView(backBuffer.Get(), nullptr, m_rtv.ReleaseAndGetAddressOf());
   if (FAILED(hr)) {
     logger::error("Failed to create RTV", hr);
     return false;
@@ -262,11 +249,7 @@ bool PreviewWindow::CreateRTV() {
 }
 
 void PreviewWindow::ResizeSwapChain() {
-  if (m_rtv) {
-    m_rtv->Release();
-    m_rtv = nullptr;
-  }
-
+  m_rtv.Reset();
   m_swapChain->ResizeBuffers(0, 0, 0, DXGI_FORMAT_UNKNOWN, 0);
   CreateRTV();
   m_resizeNeeded = false;
@@ -277,7 +260,7 @@ void PreviewWindow::Present(ID3D11Texture2D* capturedTexture) {
     ResizeSwapChain();
   }
 
-  ID3D11ShaderResourceView* srv = nullptr;
+  ComPtr<ID3D11ShaderResourceView> srv;
   D3D11_TEXTURE2D_DESC texDesc{};
   capturedTexture->GetDesc(&texDesc);
 
@@ -286,7 +269,7 @@ void PreviewWindow::Present(ID3D11Texture2D* capturedTexture) {
   srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
   srvDesc.Texture2D.MipLevels = 1;
 
-  HRESULT hr = m_device->CreateShaderResourceView(capturedTexture, &srvDesc, &srv);
+  HRESULT hr = m_device->CreateShaderResourceView(capturedTexture, &srvDesc, srv.GetAddressOf());
   if (FAILED(hr)) {
     logger::error("Failed to create SRV", hr);
     return;
@@ -300,18 +283,16 @@ void PreviewWindow::Present(ID3D11Texture2D* capturedTexture) {
   vp.Height = static_cast<float>(scDesc.BufferDesc.Height);
   vp.MaxDepth = 1.0f;
 
-  m_context->OMSetRenderTargets(1, &m_rtv, nullptr);
+  m_context->OMSetRenderTargets(1, m_rtv.GetAddressOf(), nullptr);
   m_context->RSSetViewports(1, &vp);
-  m_context->VSSetShader(m_vs, nullptr, 0);
-  m_context->PSSetShader(m_ps, nullptr, 0);
-  m_context->PSSetShaderResources(0, 1, &srv);
-  m_context->PSSetSamplers(0, 1, &m_sampler);
+  m_context->VSSetShader(m_vs.Get(), nullptr, 0);
+  m_context->PSSetShader(m_ps.Get(), nullptr, 0);
+  m_context->PSSetShaderResources(0, 1, srv.GetAddressOf());
+  m_context->PSSetSamplers(0, 1, m_sampler.GetAddressOf());
   m_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
   m_context->Draw(3, 0);
 
   m_swapChain->Present(1, 0);
-
-  srv->Release();
 }
 
 bool PreviewWindow::PumpMessages() const {
@@ -327,26 +308,11 @@ bool PreviewWindow::PumpMessages() const {
 }
 
 void PreviewWindow::Cleanup() {
-  if (m_sampler) {
-    m_sampler->Release();
-    m_sampler = nullptr;
-  }
-  if (m_ps) {
-    m_ps->Release();
-    m_ps = nullptr;
-  }
-  if (m_vs) {
-    m_vs->Release();
-    m_vs = nullptr;
-  }
-  if (m_rtv) {
-    m_rtv->Release();
-    m_rtv = nullptr;
-  }
-  if (m_swapChain) {
-    m_swapChain->Release();
-    m_swapChain = nullptr;
-  }
+  m_sampler.Reset();
+  m_ps.Reset();
+  m_vs.Reset();
+  m_rtv.Reset();
+  m_swapChain.Reset();
   if (m_hwnd) {
     DestroyWindow(m_hwnd);
     m_hwnd = nullptr;
